@@ -150,41 +150,8 @@ body { overscroll-behavior: none; }
 }
 
 /* ==========================================================================
-   Счётчик и меню
+   Меню
    ========================================================================== */
-
-.counter {
-  position: absolute;
-  z-index: 4;
-  top: calc(var(--v) * 2 + env(safe-area-inset-top, 0px));
-  left: calc(var(--u) * 5);
-  display: flex;
-  align-items: baseline;
-  gap: calc(var(--u) * 1.6);
-  color: #eaf7fb;
-  opacity: .5;
-  pointer-events: none;
-  transition: opacity .3s ease;
-  text-shadow: 0 calc(var(--u) * .3) calc(var(--u) * 1.4) rgba(0, 20, 30, .45);
-}
-.counter__num {
-  font-size: calc(var(--u) * 7.4);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.counter__cap {
-  font-size: calc(var(--u) * 3.5);
-  font-weight: 600;
-  letter-spacing: .04em;
-}
-.counter.is-bump { opacity: .75; }
-.counter.is-bump .counter__num { animation: bump .34s ease-out; }
-@keyframes bump {
-  0%   { transform: scale(1); }
-  38%  { transform: scale(1.26); }
-  100% { transform: scale(1); }
-}
 
 .menu {
   position: absolute;
@@ -292,23 +259,25 @@ body { overscroll-behavior: none; }
   100% { transform: scale(1, 1); }
 }
 
-/* приход новой овцы справа */
-.sheep-holder.is-entering { animation: enterRight var(--walk-ms, 1050ms) cubic-bezier(.25, .6, .3, 1) forwards; }
-@keyframes enterRight {
-  0%   { translate: 92% 0; }
+/* новая овца ЗАПРЫГИВАЕТ в кадр справа той же дугой */
+.sheep-holder.is-entering { animation: enterLeap var(--walk-ms, 850ms) cubic-bezier(.3, .2, .55, 1) forwards; }
+@keyframes enterLeap {
+  0%   { translate: 105% 0; }
   100% { translate: 0 0; }
 }
-.sheep-hop.is-walking { animation: walkBob var(--walk-ms, 1050ms) linear forwards; }
-@keyframes walkBob {
-  0%   { translate: 0 0; }
-  12%  { translate: 0 -5%; }
-  25%  { translate: 0 0; }
-  37%  { translate: 0 -4.5%; }
-  50%  { translate: 0 0; }
-  63%  { translate: 0 -4%; }
-  76%  { translate: 0 0; }
-  89%  { translate: 0 -2.5%; }
-  100% { translate: 0 0; }
+.sheep-hop.is-leaping { animation: leapArc var(--walk-ms, 850ms) cubic-bezier(.35, .1, .6, .95) forwards; }
+@keyframes leapArc {
+  0%   { translate: 0 6%;    rotate: -9deg; }
+  42%  { translate: 0 -44%;  rotate: -6deg; }
+  88%  { translate: 0 1.5%;  rotate: 0deg; }
+  100% { translate: 0 0;     rotate: 0deg; }
+}
+/* сквош при приземлении (уже на спрайте stand) */
+.sheep.is-landing { animation: land .34s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes land {
+  0%   { transform: scale(1.07, .88); }
+  55%  { transform: scale(.97, 1.04); }
+  100% { transform: scale(1, 1); }
 }
 
 /* сотая овца уснула сама */
@@ -432,9 +401,9 @@ body { overscroll-behavior: none; }
   height: var(--keyD);
   display: grid;
   place-items: center;
-  border: calc(var(--u) * .48) solid var(--key-edge);
+  border: 0;
   border-radius: 50%;
-  background: var(--key);
+  background: none;
   color: var(--key-ink);
   font-family: inherit;
   font-size: calc(var(--keyD) * .52);
@@ -447,21 +416,29 @@ body { overscroll-behavior: none; }
     0 calc(var(--u) * .45) calc(var(--u) * 1.1) rgba(0, 20, 30, .22);
   transition:
     transform .22s cubic-bezier(.34, 1.9, .5, 1),
-    background-color .12s ease,
     box-shadow .22s ease,
     filter .12s ease;
   touch-action: manipulation;
 }
 
+/* рисованная подложка с рваным контуром (генерирует app.js) */
+.key__bg {
+  position: absolute;
+  inset: calc(var(--keyD) * -.04);
+  width: calc(100% + var(--keyD) * .08);
+  height: calc(100% + var(--keyD) * .08);
+  pointer-events: none;
+}
+.key span { position: relative; }
+
 /* тактильный отклик: мгновенно вниз, отпускание с лёгким отскоком */
 .key.is-down,
 .key:active {
   transform: scale(.88) translateY(2%);
-  background: var(--key-down);
+  filter: brightness(.93);
   box-shadow:
     0 0 calc(var(--u) * 1.2) rgba(240, 250, 255, .18),
-    0 calc(var(--u) * .15) calc(var(--u) * .5) rgba(0, 20, 30, .3),
-    inset 0 calc(var(--u) * .4) calc(var(--u) * 1) rgba(0, 20, 30, .12);
+    0 calc(var(--u) * .15) calc(var(--u) * .5) rgba(0, 20, 30, .3);
   transition-duration: .05s;
 }
 
@@ -494,32 +471,6 @@ body { overscroll-behavior: none; }
 
 .keypad.is-locked { pointer-events: none; opacity: .82; }
 .entry.is-locked  { opacity: .85; }
-
-/* ==========================================================================
-   Тост
-   ========================================================================== */
-
-.toast {
-  position: absolute;
-  z-index: 7;
-  left: 8%;
-  right: 8%;
-  top: 19%;
-  padding: calc(var(--u) * 3.4) calc(var(--u) * 4);
-  border-radius: calc(var(--u) * 4.5);
-  background: rgba(15, 49, 89, .92);
-  color: #eefaff;
-  font-size: calc(var(--u) * 4.3);
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: center;
-  box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 5) rgba(0, 0, 0, .34);
-  opacity: 0;
-  transform: translateY(calc(var(--u) * 2.4)) scale(.96);
-  transition: opacity .28s ease, transform .28s ease;
-  pointer-events: none;
-}
-.toast.is-on { opacity: 1; transform: translateY(0) scale(1); }
 
 /* ==========================================================================
    Меню-панель
@@ -555,9 +506,17 @@ body { overscroll-behavior: none; }
 .sheet__grip {
   width: calc(var(--u) * 16);
   height: calc(var(--u) * 1.1);
-  margin: 0 auto calc(var(--u) * 4);
+  margin: 0 auto calc(var(--u) * 3);
   border-radius: 999px;
   background: rgba(234, 247, 251, .35);
+}
+
+.sheet__title {
+  margin: 0 0 calc(var(--u) * 3.4);
+  font-size: calc(var(--u) * 4.6);
+  font-weight: 800;
+  text-align: center;
+  opacity: .85;
 }
 
 .stat {
@@ -601,6 +560,7 @@ body { overscroll-behavior: none; }
   cursor: pointer;
 }
 .row:active { background: rgba(255, 255, 255, .13); }
+.row span { padding-right: calc(var(--u) * 2.4); }
 .row--danger { color: #ff9bb4; justify-content: center; }
 
 .sw {
@@ -671,6 +631,9 @@ body { overscroll-behavior: none; }
    ========================================================================== */
 
 @media (max-width: 640px) {
+  /* низ страницы под home-индикатором iOS красим зеленью поля,
+     чтобы не было тёмной полосы */
+  html, body { background: #489865; }
   .room   { padding: 0; background: var(--sky); min-height: 100dvh; }
   .phone  { padding: 0; gap: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
   .phone__speaker, .phone__home { display: none; }
@@ -678,6 +641,9 @@ body { overscroll-behavior: none; }
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
+  html, body { background: #489865; }
+  /* фиксируем страницу: убирает резиновый скролл и «хвост» под экраном */
+  body { position: fixed; inset: 0; width: 100%; overflow: hidden; }
   .room   { padding: 0; background: var(--sky); }
   .phone  { padding: 0; gap: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
   .phone__speaker, .phone__home { display: none; }
@@ -695,7 +661,7 @@ body { overscroll-behavior: none; }
   .sheep-holder.is-leaving,
   .sheep-hop.is-hopping,
   .sheep-holder.is-entering,
-  .sheep-hop.is-walking { animation-duration: 1ms; }
-  .counter.is-bump .counter__num { animation: none; }
+  .sheep-hop.is-leaping { animation-duration: 1ms; }
+  .sheep.is-landing { animation: none; }
   .splash { transition-duration: .1s; }
 }

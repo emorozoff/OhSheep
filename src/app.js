@@ -2,14 +2,15 @@
    app.js — логика игры на спрайтах.
 
    Овца стоит в центре → вводишь её номер → «→» → прыгает влево за экран,
-   справа приходит следующая. Ошибся — овца вздыхает (спрайт с облачком).
+   следующая ЗАПРЫГИВАЕТ в кадр справа. Ошибся — овца вздыхает и ждёт.
+   Никаких подписей и счётчиков на экране: счёт — твоя забота, в этом суть.
    ========================================================================== */
 
 import * as sfx from "./audio.js";
 
 const JUMP_MS = 950;    // прыжок влево за кадр
-const WALK_MS = 1050;   // приход новой овцы справа
-const OVERLAP = 380;    // новая выходит, пока прежняя ещё в кадре
+const LEAP_MS = 850;    // впрыгивание новой овцы справа
+const OVERLAP = 380;    // новая вылетает, пока прежняя ещё в кадре
 const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
 const MAX_DIGITS = 6;
@@ -19,9 +20,8 @@ const STORE = "ohsheep.v1";
 
 /*
   Спрайты вырезаны из референсов с общим масштабом холста 1024px по ширине.
-  width задаётся в % ширины экрана так, чтобы масштаб тел совпадал:
-  stand 569px холста = 54% экрана → 0.0949%/px.
-  dx — поправка левого края относительно stand (кроп разный из-за облачка).
+  stand 569px холста = 54% экрана. dx — поправка левого края относительно
+  stand (кроп у вздоха шире из-за облачка).
 */
 const SPRITES = {
   stand: { src: "./assets/sheep-stand.webp", w: 54.0, dx: 0 },
@@ -38,10 +38,7 @@ const el = {
   entryText: $("entryText"),
   entryHint: $("entryHint"),
   keypad: $("keypad"),
-  counter: $("counter"),
-  counterNum: $("counterNum"),
   live: $("live"),
-  toast: $("toast"),
   menuBtn: $("menuBtn"),
   sheet: $("sheet"),
   sheetScrim: $("sheetScrim"),
@@ -70,9 +67,72 @@ const st = {
   haptics: true,
 };
 
-let cur = null;          // { holder, hop, img, shadow }
-let toastTimer = null;
+let cur = null;          // { holder, hop, img, shadow, kind }
 let sighTimer = null;
+
+/* ==========================================================================
+   Рисованные кнопки: неровный круг с рваным пунктиром, как в кадре сериала.
+   Свой seed на кнопку — дефекты у всех разные, но стабильные между запусками.
+   ========================================================================== */
+
+function rng(seed) {
+  let t = seed;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sketchyCircle(seed) {
+  const rnd = rng(seed);
+  const N = 22, cx = 50, cy = 50, base = 44;
+
+  // точки круга с дрожанием радиуса и угла
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 + (rnd() - 0.5) * 0.05;
+    const r = base + (rnd() - 0.5) * 2.6;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+
+  // гладкий замкнутый путь (Catmull-Rom → Безье)
+  let d = "";
+  for (let i = 0; i < N; i++) {
+    const p0 = pts[(i - 1 + N) % N], p1 = pts[i];
+    const p2 = pts[(i + 1) % N],     p3 = pts[(i + 2) % N];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    if (i === 0) d += `M ${p1[0].toFixed(1)} ${p1[1].toFixed(1)}`;
+    d += ` C ${c1[0].toFixed(1)} ${c1[1].toFixed(1)}, ${c2[0].toFixed(1)} ${c2[1].toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  d += " Z";
+
+  // рваный пунктир: длинные штрихи, заметные неровные разрывы
+  const dash = [];
+  let total = 0;
+  while (total < 300) {
+    const s = 13 + rnd() * 26;
+    const g = 4.5 + rnd() * 5;
+    dash.push(s.toFixed(1), g.toFixed(1));
+    total += s + g;
+  }
+
+  return `<svg class="key__bg" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="${d}" fill="#eeefee"/>
+    <path d="${d}" fill="none" stroke="#1c1c1e" stroke-width="4"
+          stroke-linecap="round" stroke-dasharray="${dash.join(" ")}"
+          stroke-dashoffset="${(rnd() * 60).toFixed(1)}"/>
+  </svg>`;
+}
+
+function paintKeys() {
+  el.keypad.querySelectorAll(".key[data-d]").forEach((b) => {
+    const digit = b.textContent.trim();
+    b.innerHTML = sketchyCircle(17 + Number(digit) * 131) + `<span>${digit}</span>`;
+  });
+}
 
 /* ==========================================================================
    Хранилище
@@ -170,28 +230,34 @@ function mountSheep({ entering }) {
   holder.appendChild(shadow);
   holder.appendChild(hop);
   holder.style.setProperty("--jump-ms", JUMP_MS + "ms");
-  holder.style.setProperty("--walk-ms", WALK_MS + "ms");
+  holder.style.setProperty("--walk-ms", LEAP_MS + "ms");
   hop.style.setProperty("--jump-ms", JUMP_MS + "ms");
-  hop.style.setProperty("--walk-ms", WALK_MS + "ms");
+  hop.style.setProperty("--walk-ms", LEAP_MS + "ms");
   hop.style.setProperty("--droop", String(droopLevel()));
   el.stage.appendChild(holder);
 
   cur = { holder, hop, img, shadow, kind: "stand" };
-  setSprite(cur, "stand");
 
   if (entering) {
+    // овца впрыгивает в кадр: летит спрайтом прыжка, приземляется в стойку
+    setSprite(cur, "jump");
     holder.classList.add("is-entering");
-    hop.classList.add("is-walking");
+    hop.classList.add("is-leaping");
     setTimeout(() => {
       holder.classList.remove("is-entering");
-      hop.classList.remove("is-walking");
-    }, WALK_MS + 30);
+      hop.classList.remove("is-leaping");
+      setSprite(cur, "stand");
+      img.classList.add("is-landing");
+      setTimeout(() => img.classList.remove("is-landing"), 380);
+    }, LEAP_MS - 120);
+  } else {
+    setSprite(cur, "stand");
   }
   return cur;
 }
 
 /* ==========================================================================
-   Экран: счётчик, поле, тост
+   Поле ввода и статистика в меню
    ========================================================================== */
 
 function expected() { return st.count + 1; }
@@ -203,40 +269,13 @@ function renderEntry() {
   el.entry.classList.toggle("show-hint", st.wrongStreak >= 3 && st.entry.length === 0);
 }
 
-function renderCount(bump) {
-  el.counterNum.textContent = String(st.count);
+function renderStats() {
   el.statNow.textContent = String(st.count);
   el.statBest.textContent = String(st.best);
   el.statNights.textContent = String(st.nights);
-  if (bump) {
-    el.counter.classList.remove("is-bump");
-    void el.counter.offsetWidth;
-    el.counter.classList.add("is-bump");
-    setTimeout(() => el.counter.classList.remove("is-bump"), 600);
-  }
 }
 
 function say(msg) { el.live.textContent = msg; }
-
-function toast(text, ms = 2600) {
-  clearTimeout(toastTimer);
-  el.toast.textContent = text;
-  el.toast.classList.add("is-on");
-  if (ms > 0) toastTimer = setTimeout(() => el.toast.classList.remove("is-on"), ms);
-}
-
-function hideToast() {
-  clearTimeout(toastTimer);
-  el.toast.classList.remove("is-on");
-}
-
-const MILESTONES = {
-  10:  "Овца немного запыхалась.",
-  25:  "Овца просит перерыв. Отказано.",
-  50:  "Овца считает, что это уже перебор.",
-  75:  "Овца больше не смотрит тебе в глаза.",
-  100: "Овца уснула. Ты — нет.",
-};
 
 /* ==========================================================================
    Ввод
@@ -277,7 +316,6 @@ function clearEntry() {
 function submit() {
   if (st.asleep) {
     st.asleep = false;
-    hideToast();
     if (cur) cur.holder.remove();
     mountSheep({ entering: true });
     sfx.key();
@@ -298,12 +336,12 @@ function onRight() {
   st.entry = "";
   clearTimeout(sighTimer);
   renderEntry();
-  renderCount(true);
+  renderStats();
   save();
 
   sfx.bleat(st.count);
   haptic(26);
-  say(`Овца ${st.count} перепрыгнула. Введи ${expected()}.`);
+  say(`Овца ${st.count} перепрыгнула. Следующая — ${expected()}.`);
 
   const old = cur;
   setSprite(old, "jump");
@@ -325,16 +363,9 @@ function onRight() {
       z.className = "zzz";
       z.textContent = "z";
       cur.hop.appendChild(z);
-      toast(MILESTONES[100], 0);
       say("Овца уснула. Нажми стрелку, чтобы позвать следующую.");
     }
-  }, OVERLAP + WALK_MS);
-
-  const line = MILESTONES[st.count];
-  if (line && !willSleep) {
-    setTimeout(() => toast(line), OVERLAP + WALK_MS + 120);
-    sfx.chime();
-  }
+  }, OVERLAP + LEAP_MS);
 }
 
 function onWrong() {
@@ -364,8 +395,6 @@ function onWrong() {
   haptic([30, 50, 30]);
   renderEntry();
   say(`Не то число. Овца ждёт ${expected()}.`);
-
-  if (st.wrongStreak === 2) toast("Овца ждёт своё число.", 2000);
 }
 
 /* ==========================================================================
@@ -374,7 +403,7 @@ function onWrong() {
 
 function openSheet() {
   el.sheet.hidden = false;
-  renderCount(false);
+  renderStats();
   void el.sheet.offsetWidth;
   el.sheet.classList.add("is-open");
   el.menuBtn.setAttribute("aria-expanded", "true");
@@ -405,13 +434,11 @@ function resetNight() {
   st.asleep = false;
   st.nights += 1;
   save();
-  hideToast();
   renderEntry();
-  renderCount(false);
+  renderStats();
   if (cur) cur.holder.remove();
   mountSheep({ entering: true });
   closeSheet();
-  toast("Новая ночь. Овца номер один готова.", 2400);
 }
 
 /* ==========================================================================
@@ -518,8 +545,9 @@ function start() {
   window.addEventListener("resize", sizeUnits);
   window.addEventListener("orientationchange", () => setTimeout(sizeUnits, 120));
 
+  paintKeys();
   renderEntry();
-  renderCount(false);
+  renderStats();
   mountSheep({ entering: false });
   bind();
 
@@ -527,7 +555,6 @@ function start() {
   setTimeout(() => {
     el.splash.classList.add("is-done");
     setTimeout(() => el.splash.remove(), 700);
-    if (st.count === 0) toast("Введи номер овцы и нажми стрелку.", 3400);
   }, SPLASH_MS);
 }
 

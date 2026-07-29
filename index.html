@@ -34,11 +34,6 @@
       <!-- лёгкое свечение экрана -->
       <div class="glow" aria-hidden="true"></div>
 
-      <!-- счётчик -->
-      <div class="counter" id="counter">
-        <span class="counter__num" id="counterNum">0</span>
-        <span class="counter__cap">овец</span>
-      </div>
       <p class="sr-only" id="live" role="status" aria-live="polite"></p>
 
       <!-- меню -->
@@ -85,40 +80,34 @@
         </div>
       </div>
 
-      <!-- тост -->
-      <div class="toast" id="toast" aria-hidden="true"></div>
-
       <!-- меню-панель -->
       <div class="sheet" id="sheet" hidden>
         <div class="sheet__scrim" id="sheetScrim"></div>
-        <div class="sheet__panel" role="dialog" aria-modal="true" aria-label="Меню">
+        <div class="sheet__panel" role="dialog" aria-modal="true" aria-label="Настройки">
           <div class="sheet__grip"></div>
+          <h2 class="sheet__title">Настройки. Зачем-то.</h2>
 
           <div class="stat">
-            <div class="stat__cell"><b id="statNow">0</b><span>сейчас</span></div>
-            <div class="stat__cell"><b id="statBest">0</b><span>рекорд</span></div>
-            <div class="stat__cell"><b id="statNights">0</b><span>ночей</span></div>
+            <div class="stat__cell"><b id="statNow">0</b><span>овец сегодня</span></div>
+            <div class="stat__cell"><b id="statBest">0</b><span>рекорд, увы</span></div>
+            <div class="stat__cell"><b id="statNights">0</b><span>таких ночей</span></div>
           </div>
 
           <button class="row" type="button" id="tglSound" aria-pressed="true">
-            <span>Звук</span><i class="sw"></i>
+            <span>Звук «мееее»</span><i class="sw"></i>
           </button>
           <button class="row" type="button" id="tglCrickets" aria-pressed="true">
-            <span>Сверчки</span><i class="sw"></i>
+            <span>Сверчки (работают за еду)</span><i class="sw"></i>
           </button>
           <button class="row" type="button" id="tglHaptics" aria-pressed="true">
-            <span>Вибрация</span><i class="sw"></i>
+            <span>Вибрация от топота копыт</span><i class="sw"></i>
           </button>
           <button class="row row--danger" type="button" id="btnReset">
-            <span>Начать ночь заново</span>
+            <span>Обнулить овец. Они не узнают</span>
           </button>
 
-          <p class="about">
-            OhSheet by emorozoff. Овца прыгает — ты вводишь её номер.
-            Ошибся — овца вздыхает и остаётся.<br>
-            Фанатская поделка по мотивам сцены из мультсериала. Без официальной связи с правообладателями.
-          </p>
-          <button class="sheet__close" type="button" id="sheetClose">Закрыть</button>
+          <p class="about">Не одобрено овцами.</p>
+          <button class="sheet__close" type="button" id="sheetClose">Ладно</button>
         </div>
       </div>
 
