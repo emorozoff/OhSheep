@@ -259,17 +259,25 @@ body { overscroll-behavior: none; }
   100% { transform: scale(1, 1); }
 }
 
-/* новая овца ЗАПРЫГИВАЕТ в кадр справа той же дугой */
-.sheep-holder.is-entering { animation: enterLeap var(--walk-ms, 850ms) cubic-bezier(.3, .2, .55, 1) forwards; }
+/*
+  Новая овца ЗАПРЫГИВАЕТ в кадр справа — зеркально выходу:
+  X быстро пролетается в начале (пока овца ещё за краем), поэтому пик
+  дуги на полной высоте (-46%) приходится на середину, когда овца уже
+  в кадре, и дальше она падает на своё место.
+*/
+.sheep-holder.is-entering { animation: enterLeap var(--walk-ms, 950ms) cubic-bezier(.17, .67, .42, .98) forwards; }
 @keyframes enterLeap {
-  0%   { translate: 105% 0; }
+  0%   { translate: 112% 0; }
   100% { translate: 0 0; }
 }
-.sheep-hop.is-leaping { animation: leapArc var(--walk-ms, 850ms) cubic-bezier(.35, .1, .6, .95) forwards; }
+/* тень появляется только в момент приземления */
+.sheep-holder.is-entering .sheep-shadow { opacity: 0; transform: scale(.7); }
+
+.sheep-hop.is-leaping { animation: leapArc var(--walk-ms, 950ms) cubic-bezier(.35, .1, .6, .95) forwards; }
 @keyframes leapArc {
-  0%   { translate: 0 6%;    rotate: -9deg; }
-  42%  { translate: 0 -44%;  rotate: -6deg; }
-  88%  { translate: 0 1.5%;  rotate: 0deg; }
+  0%   { translate: 0 4%;    rotate: -10deg; }
+  50%  { translate: 0 -46%;  rotate: -7deg; }
+  92%  { translate: 0 1%;    rotate: 0deg; }
   100% { translate: 0 0;     rotate: 0deg; }
 }
 /* сквош при приземлении (уже на спрайте stand) */

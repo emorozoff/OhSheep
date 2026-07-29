@@ -9,7 +9,7 @@
 import * as sfx from "./audio.js";
 
 const JUMP_MS = 950;    // прыжок влево за кадр
-const LEAP_MS = 850;    // впрыгивание новой овцы справа
+const LEAP_MS = 950;    // впрыгивание новой овцы справа — той же дугой
 const OVERLAP = 380;    // новая вылетает, пока прежняя ещё в кадре
 const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
@@ -249,7 +249,7 @@ function mountSheep({ entering }) {
       setSprite(cur, "stand");
       img.classList.add("is-landing");
       setTimeout(() => img.classList.remove("is-landing"), 380);
-    }, LEAP_MS - 120);
+    }, LEAP_MS - 30);
   } else {
     setSprite(cur, "stand");
   }
