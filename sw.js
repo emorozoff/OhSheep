@@ -4,7 +4,7 @@
    При правках бампни VERSION, иначе браузер продолжит отдавать старое.
    ========================================================================== */
 
-const VERSION = "ohsheep-v6";
+const VERSION = "ohsheep-v7";
 
 const SHELL = [
   "./",
@@ -46,6 +46,26 @@ self.addEventListener("fetch", (e) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // страницы — сначала сеть, чтобы обновления доезжали с первого запуска;
+  // без сети отдаём кэш
+  if (req.mode === "navigate") {
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(VERSION).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match(req, { ignoreSearch: true })
+            .then((hit) => hit || caches.match("./index.html"))
+        )
+    );
+    return;
+  }
 
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then((hit) => {

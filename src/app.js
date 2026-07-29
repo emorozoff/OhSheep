@@ -15,7 +15,7 @@ const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
 const MAX_DIGITS = 6;
 const NIGHT_GAP_MS = 5 * 60 * 60 * 1000;
-const SPLASH_MS = 2000;
+const SPLASH_MS = 3000;
 const STORE = "ohsheep.v1";
 
 /*
@@ -562,8 +562,22 @@ start();
 
 /* --- офлайн ---------------------------------------------------------------- */
 
+/*
+  Автообновление: когда новая версия воркера активировалась поверх старой,
+  страница один раз перезагружается — свежий код доезжает с первого же
+  запуска, а не после «закрой и открой дважды». Сплэш прячет перезагрузку.
+*/
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((reg) => {
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        nw?.addEventListener("statechange", () => {
+          if (nw.state === "activated" && navigator.serviceWorker.controller) {
+            location.reload();
+          }
+        });
+      });
+    }).catch(() => {});
   });
 }
