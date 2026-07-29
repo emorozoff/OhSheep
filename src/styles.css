@@ -630,24 +630,54 @@ body { overscroll-behavior: none; }
    Мобильный / установленный режим
    ========================================================================== */
 
+/*
+  Телефон/установленное приложение: экран растягивается ПО КРАЯМ окна
+  (fixed + inset: 0), а не через 100dvh — в iOS standalone высотные
+  единицы не включают зону home-индикатора, и снизу оставалась полоса.
+  Растяжение по inset тянет полотно до самого нижнего края.
+*/
 @media (max-width: 640px) {
-  /* низ страницы под home-индикатором iOS красим зеленью поля,
-     чтобы не было тёмной полосы */
-  html, body { background: #489865; }
-  .room   { padding: 0; background: var(--sky); min-height: 100dvh; }
-  .phone  { padding: 0; gap: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  html, body { height: 100%; overflow: hidden; background: #489865; }
+  .room {
+    position: fixed;
+    inset: 0;
+    display: block;
+    padding: 0;
+    min-height: 0;
+    background: var(--sky);
+  }
+  .phone { display: contents; }
   .phone__speaker, .phone__home { display: none; }
-  .screen { width: 100vw; height: 100dvh; aspect-ratio: auto; border-radius: 0; }
+  .screen {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
-  html, body { background: #489865; }
-  /* фиксируем страницу: убирает резиновый скролл и «хвост» под экраном */
-  body { position: fixed; inset: 0; width: 100%; overflow: hidden; }
-  .room   { padding: 0; background: var(--sky); }
-  .phone  { padding: 0; gap: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  html, body { height: 100%; overflow: hidden; background: #489865; }
+  .room {
+    position: fixed;
+    inset: 0;
+    display: block;
+    padding: 0;
+    min-height: 0;
+    background: var(--sky);
+  }
+  .phone { display: contents; }
   .phone__speaker, .phone__home { display: none; }
-  .screen { width: 100vw; height: 100dvh; aspect-ratio: auto; border-radius: 0; }
+  .screen {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
 }
 
 @media (min-width: 641px) and (max-height: 640px) {
