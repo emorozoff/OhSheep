@@ -1,20 +1,33 @@
 /* ==========================================================================
-   app.js — логика игры.
+   app.js — логика игры на спрайтах.
 
-   Цикл: овца стоит в центре → вводишь её номер → «→» → она перепрыгивает
-   влево за кадр, справа приходит следующая. Ошибся — овца вздыхает и остаётся.
+   Овца стоит в центре → вводишь её номер → «→» → прыгает влево за экран,
+   справа приходит следующая. Ошибся — овца вздыхает (спрайт с облачком).
    ========================================================================== */
 
-import { createSheep, setTired, blink, sigh, fallAsleep } from "./sheep.js";
 import * as sfx from "./audio.js";
 
-const JUMP_MS = 900;    // прыжок влево за кадр
-const WALK_MS = 850;    // приход новой овцы справа
-const OVERLAP = 400;    // новая выходит, пока прежняя ещё в кадре
+const JUMP_MS = 950;    // прыжок влево за кадр
+const WALK_MS = 1050;   // приход новой овцы справа
+const OVERLAP = 380;    // новая выходит, пока прежняя ещё в кадре
+const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
 const MAX_DIGITS = 6;
 const NIGHT_GAP_MS = 5 * 60 * 60 * 1000;
+const SPLASH_MS = 2000;
 const STORE = "ohsheep.v1";
+
+/*
+  Спрайты вырезаны из референсов с общим масштабом холста 1024px по ширине.
+  width задаётся в % ширины экрана так, чтобы масштаб тел совпадал:
+  stand 569px холста = 54% экрана → 0.0949%/px.
+  dx — поправка левого края относительно stand (кроп разный из-за облачка).
+*/
+const SPRITES = {
+  stand: { src: "./assets/sheep-stand.webp", w: 54.0, dx: 0 },
+  sigh:  { src: "./assets/sheep-sigh.webp",  w: 55.1, dx: -1.0 },
+  jump:  { src: "./assets/sheep-jump.webp",  w: 62.0, dx: -2.0 },
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,6 +46,7 @@ const el = {
   sheet: $("sheet"),
   sheetScrim: $("sheetScrim"),
   sheetClose: $("sheetClose"),
+  splash: $("splash"),
   statNow: $("statNow"),
   statBest: $("statBest"),
   statNights: $("statNights"),
@@ -56,9 +70,9 @@ const st = {
   haptics: true,
 };
 
-let cur = null;          // { holder, hop, svg } — овца в кадре
-let blinkTimer = null;
+let cur = null;          // { holder, hop, img, shadow }
 let toastTimer = null;
+let sighTimer = null;
 
 /* ==========================================================================
    Хранилище
@@ -82,7 +96,6 @@ function load() {
     } catch { /* битые данные — начинаем заново */ }
   }
 
-  // долгий перерыв = новая ночь, счёт начинается с нуля
   if (st.lastOpen && now - st.lastOpen > NIGHT_GAP_MS) {
     st.nights += 1;
     st.count = 0;
@@ -102,7 +115,7 @@ function save() {
       crickets: st.crickets,
       haptics: st.haptics,
     }));
-  } catch { /* нет доступа к localStorage — играем без сохранения */ }
+  } catch { /* нет localStorage — играем без сохранения */ }
 }
 
 /* ==========================================================================
@@ -113,43 +126,58 @@ function sizeUnits() {
   const r = el.screen.getBoundingClientRect();
   if (!r.width || !r.height) return;
   const root = document.documentElement;
-  const u = r.width / 100;
-  const v = r.height / 100;
-  if (Math.abs(parseFloat(root.style.getPropertyValue("--u")) - u) > 0.02 ||
-      Math.abs(parseFloat(root.style.getPropertyValue("--v")) - v) > 0.02 ||
-      !root.style.getPropertyValue("--u")) {
-    root.style.setProperty("--u", u + "px");
-    root.style.setProperty("--v", v + "px");
-  }
+  root.style.setProperty("--u", r.width / 100 + "px");
+  root.style.setProperty("--v", r.height / 100 + "px");
 }
 
 /* ==========================================================================
    Овца
    ========================================================================== */
 
-function tiredLevel() {
+function setSprite(entry, kind) {
+  const s = SPRITES[kind];
+  entry.img.src = s.src;
+  entry.hop.style.width = s.w + "%";
+  entry.hop.style.left = 16 + s.dx + "%";
+  entry.kind = kind;
+}
+
+function droopLevel() {
   const c = st.count;
-  if (c >= 80) return 4;
-  if (c >= 45) return 3;
-  if (c >= 22) return 2;
-  if (c >= 9) return 1;
+  if (c >= 80) return 1;
+  if (c >= 45) return 0.7;
+  if (c >= 22) return 0.45;
+  if (c >= 9) return 0.2;
   return 0;
 }
 
 function mountSheep({ entering }) {
   const holder = document.createElement("div");
   holder.className = "sheep-holder";
+
+  const shadow = document.createElement("div");
+  shadow.className = "sheep-shadow";
+
   const hop = document.createElement("div");
   hop.className = "sheep-hop";
-  const svg = createSheep(tiredLevel());
 
-  hop.appendChild(svg);
+  const img = document.createElement("img");
+  img.className = "sheep";
+  img.alt = "";
+  img.draggable = false;
+
+  hop.appendChild(img);
+  holder.appendChild(shadow);
   holder.appendChild(hop);
   holder.style.setProperty("--jump-ms", JUMP_MS + "ms");
   holder.style.setProperty("--walk-ms", WALK_MS + "ms");
   hop.style.setProperty("--jump-ms", JUMP_MS + "ms");
   hop.style.setProperty("--walk-ms", WALK_MS + "ms");
+  hop.style.setProperty("--droop", String(droopLevel()));
   el.stage.appendChild(holder);
+
+  cur = { holder, hop, img, shadow, kind: "stand" };
+  setSprite(cur, "stand");
 
   if (entering) {
     holder.classList.add("is-entering");
@@ -159,17 +187,7 @@ function mountSheep({ entering }) {
       hop.classList.remove("is-walking");
     }, WALK_MS + 30);
   }
-
-  cur = { holder, hop, svg };
   return cur;
-}
-
-function scheduleBlink() {
-  clearTimeout(blinkTimer);
-  blinkTimer = setTimeout(() => {
-    if (cur && !st.asleep) blink(cur.svg);
-    scheduleBlink();
-  }, 2600 + Math.random() * 4200);
 }
 
 /* ==========================================================================
@@ -194,6 +212,7 @@ function renderCount(bump) {
     el.counter.classList.remove("is-bump");
     void el.counter.offsetWidth;
     el.counter.classList.add("is-bump");
+    setTimeout(() => el.counter.classList.remove("is-bump"), 600);
   }
 }
 
@@ -231,7 +250,7 @@ function haptic(pattern) {
 function pressDigit(d) {
   if (st.asleep) return;
   if (st.entry.length >= MAX_DIGITS) return;
-  if (st.entry === "0") st.entry = "";           // не даём ведущий ноль
+  if (st.entry === "0") st.entry = "";
   st.entry += d;
   sfx.key();
   haptic(8);
@@ -256,7 +275,6 @@ function clearEntry() {
 }
 
 function submit() {
-  // овца уснула — «→» будит следующую
   if (st.asleep) {
     st.asleep = false;
     hideToast();
@@ -278,6 +296,7 @@ function onRight() {
   st.count += 1;
   if (st.count > st.best) st.best = st.count;
   st.entry = "";
+  clearTimeout(sighTimer);
   renderEntry();
   renderCount(true);
   save();
@@ -287,24 +306,25 @@ function onRight() {
   say(`Овца ${st.count} перепрыгнула. Введи ${expected()}.`);
 
   const old = cur;
+  setSprite(old, "jump");
+  old.img.classList.remove("is-sighing");
   old.holder.classList.add("is-leaving");
   old.hop.classList.add("is-hopping");
 
   const willSleep = st.count >= SLEEP_AT;
 
-  setTimeout(() => {
-    mountSheep({ entering: true });
-    setTired(cur.svg, tiredLevel());
-  }, OVERLAP);
-
+  setTimeout(() => mountSheep({ entering: true }), OVERLAP);
   setTimeout(() => old.holder.remove(), JUMP_MS + 40);
 
   setTimeout(() => {
     st.busy = false;
     if (willSleep && cur) {
       st.asleep = true;
-      cur.hop.classList.add("is-lying");
-      fallAsleep(cur.svg);
+      cur.img.classList.add("is-asleep");
+      const z = document.createElement("div");
+      z.className = "zzz";
+      z.textContent = "z";
+      cur.hop.appendChild(z);
       toast(MILESTONES[100], 0);
       say("Овца уснула. Нажми стрелку, чтобы позвать следующую.");
     }
@@ -326,7 +346,20 @@ function onWrong() {
   el.entry.classList.add("is-wrong");
   setTimeout(() => el.entry.classList.remove("is-wrong"), 460);
 
-  if (cur) sigh(cur.svg);
+  if (cur && cur.kind !== "sigh") {
+    setSprite(cur, "sigh");
+    cur.img.classList.remove("is-sighing");
+    void cur.img.offsetWidth;
+    cur.img.classList.add("is-sighing");
+    clearTimeout(sighTimer);
+    sighTimer = setTimeout(() => {
+      if (cur && cur.kind === "sigh") {
+        setSprite(cur, "stand");
+        cur.img.classList.remove("is-sighing");
+      }
+    }, SIGH_MS);
+  }
+
   sfx.sigh();
   haptic([30, 50, 30]);
   renderEntry();
@@ -382,6 +415,33 @@ function resetNight() {
 }
 
 /* ==========================================================================
+   Тактильность клавиш: мгновенный отклик на pointerdown
+   ========================================================================== */
+
+function bindTactile() {
+  const down = (e) => {
+    const b = e.target.closest(".key");
+    if (!b) return;
+    b.classList.add("is-down");
+  };
+  const up = () => {
+    el.keypad.querySelectorAll(".key.is-down")
+      .forEach((b) => b.classList.remove("is-down"));
+  };
+  el.keypad.addEventListener("pointerdown", down);
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+}
+
+/* физическая клавиатура подсвечивает кнопки на экране */
+function flashKey(selector) {
+  const b = el.keypad.querySelector(selector);
+  if (!b) return;
+  b.classList.add("is-down");
+  setTimeout(() => b.classList.remove("is-down"), 110);
+}
+
+/* ==========================================================================
    Запуск
    ========================================================================== */
 
@@ -401,10 +461,22 @@ function bind() {
       if (e.key === "Escape") closeSheet();
       return;
     }
-    if (e.key >= "0" && e.key <= "9") { pressDigit(e.key); e.preventDefault(); }
-    else if (e.key === "Enter" || e.key === " ") { submit(); e.preventDefault(); }
-    else if (e.key === "Backspace") { pressDel(); e.preventDefault(); }
-    else if (e.key === "Escape") { clearEntry(); e.preventDefault(); }
+    if (e.key >= "0" && e.key <= "9") {
+      pressDigit(e.key);
+      flashKey(`[data-d="${e.key}"]`);
+      e.preventDefault();
+    } else if (e.key === "Enter" || e.key === " ") {
+      submit();
+      flashKey('[data-act="ok"]');
+      e.preventDefault();
+    } else if (e.key === "Backspace") {
+      pressDel();
+      flashKey('[data-act="del"]');
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      clearEntry();
+      e.preventDefault();
+    }
   });
 
   el.menuBtn.addEventListener("click", openSheet);
@@ -419,15 +491,15 @@ function bind() {
   bindToggle(el.tglCrickets, "crickets", (on) => sfx.setCrickets(on));
   bindToggle(el.tglHaptics, "haptics", (on) => on && haptic(20));
 
+  bindTactile();
+
   // звук в браузере можно запустить только после жеста пользователя
   const wake = () => {
     sfx.unlock();
     if (st.sound && st.crickets) sfx.startCrickets();
-    window.removeEventListener("pointerdown", wake);
-    window.removeEventListener("keydown", wake);
   };
-  window.addEventListener("pointerdown", wake, { once: false });
-  window.addEventListener("keydown", wake, { once: false });
+  window.addEventListener("pointerdown", wake);
+  window.addEventListener("keydown", wake);
 
   window.addEventListener("beforeunload", save);
   document.addEventListener("visibilitychange", () => {
@@ -449,12 +521,14 @@ function start() {
   renderEntry();
   renderCount(false);
   mountSheep({ entering: false });
-  scheduleBlink();
   bind();
 
-  if (st.count === 0) {
-    setTimeout(() => toast("Введи номер овцы и нажми стрелку.", 3400), 700);
-  }
+  // сплэш держится 2 секунды и растворяется
+  setTimeout(() => {
+    el.splash.classList.add("is-done");
+    setTimeout(() => el.splash.remove(), 700);
+    if (st.count === 0) toast("Введи номер овцы и нажми стрелку.", 3400);
+  }, SPLASH_MS);
 }
 
 start();

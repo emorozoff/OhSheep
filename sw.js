@@ -4,17 +4,21 @@
    При правках бампни VERSION, иначе браузер продолжит отдавать старое.
    ========================================================================== */
 
-const VERSION = "ohsheep-v1";
+const VERSION = "ohsheep-v2";
 
 const SHELL = [
   "./",
   "./index.html",
   "./src/styles.css",
   "./src/app.js",
-  "./src/sheep.js",
   "./src/audio.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",
+  "./assets/bg.webp",
+  "./assets/splash.webp",
+  "./assets/sheep-stand.webp",
+  "./assets/sheep-sigh.webp",
+  "./assets/sheep-jump.webp",
 ];
 
 self.addEventListener("install", (e) => {

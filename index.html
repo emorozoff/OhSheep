@@ -3,17 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<title>OhSheep — считай овец перед сном</title>
+<title>OhSheet — считай овец перед сном</title>
 <meta name="description" content="Считай овец перед сном. Овца прыгает, ты вводишь её номер. Ошибся — овца вздыхает.">
-<meta name="theme-color" content="#2a5670">
+<meta name="theme-color" content="#05597f">
 <meta name="color-scheme" content="dark">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="./assets/icon.svg">
 <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="OhSheep">
+<meta name="apple-mobile-web-app-title" content="OhSheet">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preload" as="image" href="./assets/bg.webp">
+<link rel="preload" as="image" href="./assets/sheep-stand.webp">
+<link rel="preload" as="image" href="./assets/sheep-jump.webp">
+<link rel="preload" as="image" href="./assets/sheep-sigh.webp">
 <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
@@ -24,63 +28,28 @@
 
     <div class="screen" id="screen">
 
-      <!-- ============ ФОН: небо, луна, холм, поле ============ -->
-      <div class="scene" aria-hidden="true">
-        <div class="sky"></div>
+      <!-- фон: настоящая картинка сцены -->
+      <img class="bg" src="./assets/bg.webp" alt="" aria-hidden="true" draggable="false">
 
-        <svg class="moon" viewBox="0 0 100 100" fill="none">
-          <path d="M74 8c-9 8-15 20-15 34 0 19 12 35 29 41-6 3-13 5-21 5-25 0-45-20-45-45S42 -2 67 -2c3 0 5 .2 7 .6z"
-                transform="translate(2 4)" fill="var(--moon)"/>
-        </svg>
+      <!-- лёгкое свечение экрана -->
+      <div class="glow" aria-hidden="true"></div>
 
-        <svg class="hill" viewBox="0 0 100 24" preserveAspectRatio="none">
-          <path class="hill__back" d="M0 13 C 18 5, 34 2, 50 3 C 68 4, 84 9, 100 15 L100 24 L0 24 Z"/>
-          <path class="hill__front" d="M0 16 C 20 9, 36 6, 52 7 C 70 8, 86 12, 100 18 L100 24 L0 24 Z"/>
-        </svg>
-
-        <div class="field"></div>
-        <div class="glow"></div>
-      </div>
-
-      <!-- ============ ШАПКА ============ -->
-      <header class="bar">
-        <div class="bar__status">
-          <svg class="ic ic--msg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="2.1"/>
-            <path d="M7.4 13.6c1.4-2.6 2.9-2.6 4.3 0 1.4 2.6 2.9 2.6 4.3 0" stroke="currentColor"
-                  stroke-width="2.1" stroke-linecap="round"/>
-          </svg>
-          <svg class="ic ic--sig" viewBox="0 0 26 20" aria-hidden="true">
-            <rect x="1"  y="13" width="4.4" height="6"  rx="1.4" fill="currentColor"/>
-            <rect x="7.4" y="9"  width="4.4" height="10" rx="1.4" fill="currentColor"/>
-            <rect x="13.8" y="5"  width="4.4" height="14" rx="1.4" fill="currentColor"/>
-            <rect x="20.2" y="1"  width="4.4" height="18" rx="1.4" fill="currentColor" opacity=".35"/>
-          </svg>
-          <svg class="ic ic--wifi" viewBox="0 0 26 20" fill="none" aria-hidden="true">
-            <path d="M2.4 7.2C5.3 4.6 8.9 3.2 13 3.2s7.7 1.4 10.6 4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-            <path d="M6 11.4c1.9-1.7 4.3-2.6 7-2.6s5.1.9 7 2.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-            <path d="M9.7 15.5c1-.8 2.1-1.2 3.3-1.2s2.3.4 3.3 1.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-          </svg>
-        </div>
-
-        <h1 class="bar__title">OhSheep</h1>
-
-        <button class="bar__menu" id="menuBtn" aria-label="Меню" aria-expanded="false">
-          <span></span><span></span><span></span>
-        </button>
-      </header>
-
-      <!-- ============ СЧЁТЧИК ============ -->
+      <!-- счётчик -->
       <div class="counter" id="counter">
         <span class="counter__num" id="counterNum">0</span>
         <span class="counter__cap">овец</span>
       </div>
       <p class="sr-only" id="live" role="status" aria-live="polite"></p>
 
-      <!-- ============ СЦЕНА С ОВЦОЙ ============ -->
+      <!-- меню -->
+      <button class="menu" id="menuBtn" aria-label="Меню" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <!-- сцена с овцой -->
       <div class="stage" id="stage"></div>
 
-      <!-- ============ ВВОД ============ -->
+      <!-- ввод -->
       <div class="controls">
         <button class="entry" id="entry" type="button" aria-label="Введи номер овцы">
           <span class="entry__hint" id="entryHint" aria-hidden="true"></span>
@@ -99,24 +68,27 @@
           <button class="key" type="button" data-d="9">9</button>
 
           <button class="key key--del" type="button" data-act="del" aria-label="Стереть">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M7 7l10 10M17 7L7 17" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+            <svg viewBox="0 0 100 76" aria-hidden="true">
+              <path d="M34 6 H86 Q94 6 94 14 V62 Q94 70 86 70 H34 L8 42 Q4 38 8 34 Z"
+                    fill="#ffa1ab" stroke="#1c1c1e" stroke-width="5" stroke-linejoin="round"/>
+              <path d="M46 26 L70 50 M70 26 L46 50" stroke="#231d1e" stroke-width="7" stroke-linecap="round"/>
             </svg>
           </button>
           <button class="key" type="button" data-d="0">0</button>
           <button class="key key--ok" type="button" data-act="ok" aria-label="Готово">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4.5 12h14" stroke="#fff" stroke-width="3.1" stroke-linecap="round"/>
-              <path d="M13 6.5l6 5.5-6 5.5" stroke="#fff" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg viewBox="0 0 100 76" aria-hidden="true">
+              <ellipse cx="50" cy="38" rx="46" ry="34" fill="#40e2e4" stroke="#1c1c1e" stroke-width="5"/>
+              <path d="M26 38 H70 M54 22 L74 38 L54 54" fill="none" stroke="#173d3f" stroke-width="7"
+                    stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
         </div>
       </div>
 
-      <!-- ============ ТОСТ ============ -->
+      <!-- тост -->
       <div class="toast" id="toast" aria-hidden="true"></div>
 
-      <!-- ============ МЕНЮ ============ -->
+      <!-- меню-панель -->
       <div class="sheet" id="sheet" hidden>
         <div class="sheet__scrim" id="sheetScrim"></div>
         <div class="sheet__panel" role="dialog" aria-modal="true" aria-label="Меню">
@@ -142,11 +114,17 @@
           </button>
 
           <p class="about">
-            Овца прыгает — ты вводишь её номер. Ошибся — овца вздыхает и остаётся.<br>
-            Фанатская поделка, вдохновлённая сценой из мультсериала. Без официальной связи с правообладателями.
+            OhSheet by emorozoff. Овца прыгает — ты вводишь её номер.
+            Ошибся — овца вздыхает и остаётся.<br>
+            Фанатская поделка по мотивам сцены из мультсериала. Без официальной связи с правообладателями.
           </p>
           <button class="sheet__close" type="button" id="sheetClose">Закрыть</button>
         </div>
+      </div>
+
+      <!-- сплэш -->
+      <div class="splash" id="splash" aria-hidden="true">
+        <img src="./assets/splash.webp" alt="OhSheet by emorozoff" draggable="false">
       </div>
 
     </div>
