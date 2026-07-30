@@ -2,7 +2,8 @@
    app.js — логика игры на спрайтах.
 
    Овца стоит в центре → вводишь её номер → «→» → прыгает влево за экран,
-   следующая ЗАПРЫГИВАЕТ в кадр справа. Ошибся — овца вздыхает и ждёт.
+   пауза на пустом кадре, затем следующая ЗАПРЫГИВАЕТ справа.
+   Ошибся — овца вздыхает и ждёт.
    Никаких подписей и счётчиков на экране: счёт — твоя забота, в этом суть.
    ========================================================================== */
 
@@ -10,7 +11,8 @@ import * as sfx from "./audio.js";
 
 const JUMP_MS = 950;    // прыжок влево за кадр
 const LEAP_MS = 950;    // впрыгивание новой овцы справа — той же дугой
-const OVERLAP = 380;    // новая вылетает, пока прежняя ещё в кадре
+const PAUSE_MS = 320;   // пустой кадр между вылетом и приходом
+const NEXT_IN = JUMP_MS + PAUSE_MS;   // когда выходит следующая овца
 const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
 const MAX_DIGITS = 6;
@@ -351,7 +353,7 @@ function onRight() {
 
   const willSleep = st.count >= SLEEP_AT;
 
-  setTimeout(() => mountSheep({ entering: true }), OVERLAP);
+  setTimeout(() => mountSheep({ entering: true }), NEXT_IN);
   setTimeout(() => old.holder.remove(), JUMP_MS + 40);
 
   setTimeout(() => {
@@ -365,7 +367,7 @@ function onRight() {
       cur.hop.appendChild(z);
       say("Овца уснула. Нажми стрелку, чтобы позвать следующую.");
     }
-  }, OVERLAP + LEAP_MS);
+  }, NEXT_IN + LEAP_MS);
 }
 
 function onWrong() {
