@@ -4,7 +4,8 @@
    Овца стоит в центре → вводишь её номер → «→» → прыгает влево за экран,
    пауза на пустом кадре, затем следующая ЗАПРЫГИВАЕТ справа.
    Ошибся — овца вздыхает и ждёт.
-   Никаких подписей и счётчиков на экране: счёт — твоя забота, в этом суть.
+   Счёт живёт только внутри забега: открыл приложение или ушёл на 10 минут —
+   считаешь заново. Никаких подписей и счётчиков на экране.
    ========================================================================== */
 
 import * as sfx from "./audio.js";
@@ -16,7 +17,7 @@ const NEXT_IN = JUMP_MS + PAUSE_MS;   // когда выходит следую�
 const SIGH_MS = 1150;   // спрайт вздоха на экране
 const SLEEP_AT = 100;   // на сотой овца сдаётся сама
 const MAX_DIGITS = 6;
-const NIGHT_GAP_MS = 5 * 60 * 60 * 1000;
+const IDLE_RESET_MS = 10 * 60 * 1000;   // пауза, после которой счёт обнуляется
 const SPLASH_MS = 3000;
 const STORE = "ohsheep.v1";
 
@@ -58,8 +59,8 @@ const el = {
 const st = {
   count: 0,
   best: 0,
-  nights: 1,
-  lastOpen: 0,
+  nights: 0,
+  lastAction: 0,
   entry: "",
   wrongStreak: 0,
   busy: false,
@@ -140,44 +141,65 @@ function paintKeys() {
    Хранилище
    ========================================================================== */
 
+/*
+  Счёт НЕ переживает запуск: открыл приложение — считаешь с первой овцы.
+  Из памяти достаём только рекорд, число заходов и настройки.
+*/
 function load() {
   let raw = null;
   try { raw = localStorage.getItem(STORE); } catch { /* приватный режим */ }
-  const now = Date.now();
 
   if (raw) {
     try {
       const d = JSON.parse(raw);
-      st.count = Number(d.count) || 0;
       st.best = Number(d.best) || 0;
-      st.nights = Number(d.nights) || 1;
-      st.lastOpen = Number(d.lastOpen) || 0;
+      st.nights = Number(d.nights) || 0;
       st.sound = d.sound !== false;
       st.crickets = d.crickets !== false;
       st.haptics = d.haptics !== false;
     } catch { /* битые данные — начинаем заново */ }
   }
 
-  if (st.lastOpen && now - st.lastOpen > NIGHT_GAP_MS) {
-    st.nights += 1;
-    st.count = 0;
-  }
-  st.lastOpen = now;
+  st.count = 0;
+  st.lastAction = Date.now();
   save();
 }
 
 function save() {
   try {
     localStorage.setItem(STORE, JSON.stringify({
-      count: st.count,
       best: st.best,
       nights: st.nights,
-      lastOpen: Date.now(),
       sound: st.sound,
       crickets: st.crickets,
       haptics: st.haptics,
     }));
   } catch { /* нет localStorage — играем без сохранения */ }
+}
+
+/* --- сброс забега ---------------------------------------------------------- */
+
+/** Начать заново: счёт с нуля, в кадре свежая овца. */
+function restartRun() {
+  st.count = 0;
+  st.entry = "";
+  st.wrongStreak = 0;
+  st.asleep = false;
+  st.busy = false;
+  clearTimeout(sighTimer);
+  st.lastAction = Date.now();
+  renderEntry();
+  renderStats();
+  if (cur) cur.holder.remove();
+  mountSheep({ entering: false });
+}
+
+function touch() { st.lastAction = Date.now(); }
+
+/** Долгая пауза — забег прерван, возвращаться к чужому счёту незачем. */
+function checkIdle() {
+  if (st.count === 0 && !st.entry.length) { touch(); return; }
+  if (Date.now() - st.lastAction > IDLE_RESET_MS) restartRun();
 }
 
 /* ==========================================================================
@@ -289,19 +311,23 @@ function haptic(pattern) {
 }
 
 function pressDigit(d) {
+  checkIdle();
   if (st.asleep) return;
   if (st.entry.length >= MAX_DIGITS) return;
   if (st.entry === "0") st.entry = "";
   st.entry += d;
+  touch();
   sfx.key();
   haptic(8);
   renderEntry();
 }
 
 function pressDel() {
+  checkIdle();
   if (st.asleep) return;
   if (!st.entry.length) return;
   st.entry = st.entry.slice(0, -1);
+  touch();
   sfx.key();
   haptic(8);
   renderEntry();
@@ -316,6 +342,9 @@ function clearEntry() {
 }
 
 function submit() {
+  checkIdle();
+  touch();
+
   if (st.asleep) {
     st.asleep = false;
     if (cur) cur.holder.remove();
@@ -334,6 +363,7 @@ function onRight() {
   st.busy = true;
   st.wrongStreak = 0;
   st.count += 1;
+  if (st.count === 1) st.nights += 1;   // забег начался только сейчас
   if (st.count > st.best) st.best = st.count;
   st.entry = "";
   clearTimeout(sighTimer);
@@ -430,16 +460,7 @@ function bindToggle(node, key, onChange) {
 }
 
 function resetNight() {
-  st.count = 0;
-  st.entry = "";
-  st.wrongStreak = 0;
-  st.asleep = false;
-  st.nights += 1;
-  save();
-  renderEntry();
-  renderStats();
-  if (cur) cur.holder.remove();
-  mountSheep({ entering: true });
+  restartRun();
   closeSheet();
 }
 
@@ -531,9 +552,12 @@ function bind() {
   window.addEventListener("keydown", wake);
 
   window.addEventListener("beforeunload", save);
+  // вернулся после долгой паузы — начинаем заново
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") save();
+    else checkIdle();
   });
+  window.addEventListener("focus", checkIdle);
 }
 
 function start() {
